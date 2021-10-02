@@ -1,0 +1,9 @@
+=== Agent Install Log ===
+=== Agent Compile Log ===
+=== Agent Error Log ===
+Traceback (most recent call last):
+  File "main.py", line 32, in <module>
+    actions = agent(observation, None)
+  File "/Users/abhishekpundir/Documents/Kaggle/Lux AI 2021/simple/agent.py", line 227, in agent
+    if unit.pos == build_location.pos: 
+AttributeError: 'NoneType' object has no attribute 'pos'

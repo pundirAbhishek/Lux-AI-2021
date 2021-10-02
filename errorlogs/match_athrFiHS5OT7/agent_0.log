@@ -1,0 +1,9 @@
+=== Agent Install Log ===
+=== Agent Compile Log ===
+=== Agent Error Log ===
+Traceback (most recent call last):
+  File "main.py", line 32, in <module>
+    actions = agent(observation, None)
+  File "/Users/abhishekpundir/Documents/Kaggle/Lux AI 2021/simple/agent.py", line 185, in agent
+    print("unit_to_city_dict" + unit_to_city_dict)
+TypeError: can only concatenate str (not "dict") to str

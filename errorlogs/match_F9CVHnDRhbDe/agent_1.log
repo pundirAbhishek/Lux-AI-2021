@@ -1,0 +1,9 @@
+=== Agent Install Log ===
+=== Agent Compile Log ===
+=== Agent Error Log ===
+Traceback (most recent call last):
+  File "main.py", line 32, in <module>
+    actions = agent(observation, None)
+  File "/Users/abhishekpundir/Documents/Kaggle/Lux AI 2021/simple/agent.py", line 163, in agent
+    cell = game_state.map.get_cell(intended_resource.pos.x, intended_resources.pos.y)
+NameError: name 'intended_resources' is not defined

@@ -1,0 +1,11 @@
+=== Agent Install Log ===
+=== Agent Compile Log ===
+=== Agent Error Log ===
+Traceback (most recent call last):
+  File "main.py", line 32, in <module>
+    actions = agent(observation, None)
+  File "/Users/abhishekpundir/Documents/Kaggle/Lux AI 2021/simple/agent.py", line 220, in agent
+    unit_to_city_dict[unit] = get_close_city(player, unit)
+  File "/Users/abhishekpundir/Documents/Kaggle/Lux AI 2021/simple/agent.py", line 51, in get_close_city
+    for k, city in player.cities.items():
+AttributeError: 'Unit' object has no attribute 'cities'
