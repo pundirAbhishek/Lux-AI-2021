@@ -11,6 +11,7 @@ logging.basicConfig(filename="agent.log", level=logging.INFO, filemode="w")
 DIRECTIONS = Constants.DIRECTIONS
 game_state = None
 
+build_location = None
 
 def get_resource_tiles(game_state, width, height):
     resource_tiles: list[Cell] = []
@@ -51,6 +52,7 @@ def get_close_city(unit, player):
 
 def agent(observation, configuration):
     global game_state
+    global build_location
 
     ### Do not edit ###
     if observation["step"] == 0:
@@ -75,10 +77,14 @@ def agent(observation, configuration):
         for c_tile in city.citytiles:
             city_tiles.append(c_tile)
 
-    logging.info(f"cities : {cities}")
-    logging.info(f"city_tiles : {city_tiles }")
+    # logging.info(f"cities : {cities}")
+    # logging.info(f"city_tiles : {city_tiles }")
 
     resource_tiles = get_resource_tiles(game_state, width, height)
+
+    build_city = False
+    if(len(city_tiles)) < 2:
+        build_city = True
 
     # we iterate over all our units and do something with them
     for unit in player.units:
@@ -90,6 +96,43 @@ def agent(observation, configuration):
                     actions.append(unit.move(unit.pos.direction_to(closest_resource_tile.pos)))
             else:
                 # if unit is a worker and there is no cargo space left, and we have cities, lets return to them
+
+                if(build_city):
+                    logging.info(f"We want to build a city")
+                    if build_location is None:
+                        empty_near = get_close_city(unit, player)
+
+                        dirs = [(1,0), (0,1), (-1,0), (0,-1)]
+
+                        for d in dirs:
+                            try:
+                                possible_build_location = game_state.map.get_cell(empty_near.pos.x + d[0], empty_near.pos.y + d[1])
+                                if possible_build_location.resource == None and possible_build_location.road == 0 and possible_build_location.citytile == None:
+                                    build_location = possible_build_location
+                                    logging.info(f"{observation['step']} : Found Build Location {build_city}") 
+                                    break
+
+                            except Exception as e:
+                                logging.warning(f"{observation['step']} : While searching for empty tiles {str(e)}")
+
+                    elif unit.pos == build_location.pos:
+                        logging.info(f"Elif Case") 
+
+                        action = unit.build_city()
+                        actions.append(action)
+
+                        build_city = False
+                        build_location = None
+                        continue
+
+                    else:
+                        logging.info(f"{observation['step']} : Navigate to where we want to build city") 
+                        move_dir = unit.pos.direction_to(build_location.pos)
+                        actions.append(unit.move(move_dir))
+                        continue
+
+
+
                 if len(player.cities) > 0:
                     closest_city_tile = get_close_city(unit, player)
                     if closest_city_tile is not None:
