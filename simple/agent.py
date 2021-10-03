@@ -13,7 +13,6 @@ logging.basicConfig(filename="agent.log", level=logging.INFO, filemode="w")
 
 statsfile = "stats.txt"
 
-
 DIRECTIONS = Constants.DIRECTIONS
 game_state = None
 
@@ -66,10 +65,9 @@ def find_empty_tile_near(empty_near, game_state, observation):
 
     build_location = None
 
-
     for i in range(5):
         v = i + 1
-        dirs = [(v,0), (0,v), (-v,0), (0,-v)]
+        dirs = [(v,0), (0,v), (-v,0), (0,-v), (v,-v), (-v,v), (-v,-v), (v,v)]
         for d in dirs:
             try:
                 possible_build_location = game_state.map.get_cell(empty_near.pos.x + d[0], empty_near.pos.y + d[1])
@@ -80,22 +78,13 @@ def find_empty_tile_near(empty_near, game_state, observation):
             except Exception as e:
                 logging.warning(f"{observation['step']} : While searching for empty tiles {str(e)}")
 
-        dirs = [(v,-v), (-v,v), (-v,-v), (v,v)]
-        for d in dirs:
-            try:
-                possible_build_location = game_state.map.get_cell(empty_near.pos.x + d[0], empty_near.pos.y + d[1])
-                if possible_build_location.resource == None and possible_build_location.road == 0 and possible_build_location.citytile == None:
-                    build_location = possible_build_location
-                    return build_location
-
-            except Exception as e:
-                logging.warning(f"{observation['step']} : While searching for empty tiles {str(e)}")
-
-    # PROBABLY should continue our search out with something like dirs = [(2,0), (0,2), (-2,0), (0,-2)]...
-    # and so on
 
     return None
 
+
+def find_distance_between_points(unit_pos, city_pos):
+    distance = math.sqrt( ((unit_pos.x-city_pos.x)**2)+((unit_pos.y-city_pos.y)**2))
+    return distance
 
 def agent(observation, configuration):
     global game_state
@@ -166,115 +155,141 @@ def agent(observation, configuration):
                     actions.append(unit.move(random.choice(["n","s","e","w"])))
                     continue
 
-            if unit.get_cargo_space_left() > 0:
-                # closest_resource_tile = get_close_resource(unit, resource_tiles, player)
+            associated_city_id = unit_to_city_dict[unit.id].cityid
+            unit_city = None
+            for city in cities:
+                if(city.cityid == associated_city_id):
+                    unit_city = city
+                    break
 
-                # if closest_resource_tile is not None:
-                #     actions.append(unit.move(unit.pos.direction_to(closest_resource_tile.pos)))
+            if(unit_city == None):
+                continue
 
-                intended_resource = unit_to_resource_dict[unit.id]
+            unit_city_tile = unit_to_city_dict[unit.id]
 
-                cell = game_state.map.get_cell(intended_resource.pos.x, intended_resource.pos.y)
+            cyclesToNight = (observation['step'] % 40) - 40
+            distance = find_distance_between_points(unit_city_tile.pos, unit.pos)
 
-                if cell.has_resource():
-                    actions.append(unit.move(unit.pos.direction_to(intended_resource.pos)))
-
-                else:
-                    intended_resource = get_close_resource(unit, resource_tiles, player)
-                    unit_to_resource_dict[unit.id] = intended_resource
-                    actions.append(unit.move(unit.pos.direction_to(intended_resource.pos)))
-
-
+            if (np.abs(cyclesToNight) <= distance and unit_city.fuel < unit_city.get_light_upkeep() * 10):
+                move_dir = unit.pos.direction_to(unit_city_tile.pos)
+                actions.append(unit.move(move_dir))
 
             else:
-                # if unit is a worker and there is no cargo space left, and we have cities, lets return to them
 
-                if(build_city):
-                    logging.info(f"We want to build a city")
+                if unit.get_cargo_space_left() > 0:
+                    # closest_resource_tile = get_close_resource(unit, resource_tiles, player)
 
-                    associated_city_id = unit_to_city_dict[unit.id].cityid
+                    # if closest_resource_tile is not None:
+                    #     actions.append(unit.move(unit.pos.direction_to(closest_resource_tile.pos)))
 
-                    unit_city = None
+                    intended_resource = unit_to_resource_dict[unit.id]
 
-                    for city in cities:
-                        if(city.cityid == associated_city_id):
-                            unit_city = city
-                            break
+                    cell = game_state.map.get_cell(intended_resource.pos.x, intended_resource.pos.y)
 
-                    if(unit_city == None):
-                        continue
+                    if cell.has_resource():
+                        actions.append(unit.move(unit.pos.direction_to(intended_resource.pos)))
 
-                    unit_city_fuel = unit_city.fuel
-                    unit_city_size = len(unit_city.citytiles)
+                    else:
+                        intended_resource = get_close_resource(unit, resource_tiles, player)
+                        unit_to_resource_dict[unit.id] = intended_resource
+                        actions.append(unit.move(unit.pos.direction_to(intended_resource.pos)))
 
-                    enough_fuel = (unit_city_fuel / unit_city_size) > 300
 
-                    if enough_fuel:
-                        if build_location is None:
-                            empty_near = get_close_city(unit, player)
-                            build_location = find_empty_tile_near(empty_near, game_state, observation)
-                            
-                            if(build_location == None):
+
+                else:
+                    # if unit is a worker and there is no cargo space left, and we have cities, lets return to them
+
+                    if(build_city):
+                        logging.info(f"We want to build a city")
+
+                        unit_city_fuel = unit_city.fuel
+                        unit_city_size = len(unit_city.citytiles)
+
+                        enough_fuel = (unit_city_fuel / unit_city_size) > 300
+
+                        if enough_fuel:
+                            if build_location is None:
+                                empty_near = get_close_city(unit, player)
+                                build_location = find_empty_tile_near(empty_near, game_state, observation)
+                                
+                                if(build_location == None):
+                                    continue
+
+                            if unit.pos == build_location.pos: 
+                                action = unit.build_city()
+                                actions.append(action)
+
+                                build_city = False
+                                build_location = None
                                 continue
 
-                        if unit.pos == build_location.pos: 
-                            action = unit.build_city()
-                            actions.append(action)
+                            else:
+                                logging.info(f"{observation['step']} : Navigate to where we want to build city")
 
-                            build_city = False
-                            build_location = None
-                            continue
+                                # move_dir = unit.pos.direction_to(build_location.pos)
+                                # actions.append(unit.move(move_dir))
 
-                        else:
-                            logging.info(f"{observation['step']} : Navigate to where we want to build city") 
-                            # move_dir = unit.pos.direction_to(build_location.pos)
-                            # actions.append(unit.move(move_dir))
+                                dir_diff = (build_location.pos.x-unit.pos.x, build_location.pos.y-unit.pos.y)
+                                xdiff = dir_diff[0]
+                                ydiff = dir_diff[1]
 
-                            dir_diff = (build_location.pos.x-unit.pos.x, build_location.pos.y-unit.pos.y)
-                            xdiff = dir_diff[0]
-                            ydiff = dir_diff[1]
+                                # decrease in x? West
+                                # increase in x? East
+                                # decrease in y? North
+                                # increase in y? South
+                                
+                                if abs(ydiff) > abs(xdiff):
+                                    # if the move is greater in the y axis, then lets consider moving once in that dir
+                                    check_tile = game_state.map.get_cell(unit.pos.x, unit.pos.y+np.sign(ydiff))
+                                    if check_tile.citytile == None:
+                                        if np.sign(ydiff) == 1:
+                                            actions.append(unit.move("s"))
+                                        else:
+                                            actions.append(unit.move("n"))
 
-                            # decrease in x? West
-                            # increase in x? East
-                            # decrease in y? North
-                            # increase in y? South
-                            
-                            if abs(ydiff) > abs(xdiff):
-                                # if the move is greater in the y axis, then lets consider moving once in that dir
-                                check_tile = game_state.map.get_cell(unit.pos.x, unit.pos.y+np.sign(ydiff))
-                                if check_tile.citytile == None:
-                                    if np.sign(ydiff) == 1:
-                                        actions.append(unit.move("s"))
                                     else:
-                                        actions.append(unit.move("n"))
+                                        # there's a city tile, so we want to move in the other direction that we overall want to move
+                                        if np.sign(xdiff) == 1:
+                                            actions.append(unit.move("e"))
+                                        else:
+                                            actions.append(unit.move("w"))
 
                                 else:
-                                    # there's a city tile, so we want to move in the other direction that we overall want to move
-                                    if np.sign(xdiff) == 1:
-                                        actions.append(unit.move("e"))
+                                    # if the move is greater in the y axis, then lets consider moving once in that dir
+                                    check_tile = game_state.map.get_cell(unit.pos.x+np.sign(xdiff), unit.pos.y)
+                                    if check_tile.citytile == None:
+                                        if np.sign(xdiff) == 1:
+                                            actions.append(unit.move("e"))
+                                        else:
+                                            actions.append(unit.move("w"))
+
                                     else:
-                                        actions.append(unit.move("w"))
+                                        # there's a city tile, so we want to move in the other direction that we overall want to move
+                                        if np.sign(ydiff) == 1:
+                                            actions.append(unit.move("s"))
+                                        else:
+                                            actions.append(unit.move("n"))
+
+
+                                continue
+                        
+                        elif len(player.cities) > 0: 
+
+                            if unit.id in unit_to_city_dict and unit_to_city_dict[unit.id] in city_tiles:
+                                move_dir = unit.pos.direction_to(unit_to_city_dict[unit.id].pos)
+                                actions.append(unit.move(move_dir))
 
                             else:
-                                # if the move is greater in the y axis, then lets consider moving once in that dir
-                                check_tile = game_state.map.get_cell(unit.pos.x+np.sign(xdiff), unit.pos.y)
-                                if check_tile.citytile == None:
-                                    if np.sign(xdiff) == 1:
-                                        actions.append(unit.move("e"))
-                                    else:
-                                        actions.append(unit.move("w"))
-
-                                else:
-                                    # there's a city tile, so we want to move in the other direction that we overall want to move
-                                    if np.sign(ydiff) == 1:
-                                        actions.append(unit.move("s"))
-                                    else:
-                                        actions.append(unit.move("n"))
+                                unit_to_city_dict[unit] = get_close_city(unit, player)
+                                move_dir = unit.pos.direction_to(unit_to_city_dict[unit.id].pos)
+                                actions.append(unit.move(move_dir))
 
 
-                            continue
-                    
-                    elif len(player.cities) > 0: 
+                    elif len(player.cities) > 0:
+                        # closest_city_tile = get_close_city(unit, player)
+                        # if closest_city_tile is not None:
+                        #     move_dir = unit.pos.direction_to(closest_city_tile.pos)
+                        #     actions.append(unit.move(move_dir))
 
                         if unit.id in unit_to_city_dict and unit_to_city_dict[unit.id] in city_tiles:
                             move_dir = unit.pos.direction_to(unit_to_city_dict[unit.id].pos)
@@ -284,22 +299,6 @@ def agent(observation, configuration):
                             unit_to_city_dict[unit] = get_close_city(unit, player)
                             move_dir = unit.pos.direction_to(unit_to_city_dict[unit.id].pos)
                             actions.append(unit.move(move_dir))
-
-
-                elif len(player.cities) > 0:
-                    # closest_city_tile = get_close_city(unit, player)
-                    # if closest_city_tile is not None:
-                    #     move_dir = unit.pos.direction_to(closest_city_tile.pos)
-                    #     actions.append(unit.move(move_dir))
-
-                    if unit.id in unit_to_city_dict and unit_to_city_dict[unit.id] in city_tiles:
-                        move_dir = unit.pos.direction_to(unit_to_city_dict[unit.id].pos)
-                        actions.append(unit.move(move_dir))
-
-                    else:
-                        unit_to_city_dict[unit] = get_close_city(unit, player)
-                        move_dir = unit.pos.direction_to(unit_to_city_dict[unit.id].pos)
-                        actions.append(unit.move(move_dir))
 
 
     # you can add debug annotations using the functions in the annotate object

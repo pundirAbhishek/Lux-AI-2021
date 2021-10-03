@@ -1,0 +1,9 @@
+=== Agent Install Log ===
+=== Agent Compile Log ===
+=== Agent Error Log ===
+Traceback (most recent call last):
+  File "main.py", line 32, in <module>
+    actions = agent(observation, None)
+  File "/Users/abhishekpundir/Documents/Kaggle/Lux AI 2021/simple/agent.py", line 189, in agent
+    move_dir = unit.pos.direction_to(unit_city.pos)
+AttributeError: 'City' object has no attribute 'pos'
